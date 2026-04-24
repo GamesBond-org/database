@@ -2,7 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: gamesbond-route
-  namespace: prod
+  namespace: dev
 spec:
   parentRefs:
   - name: gamesbond-gateway
@@ -11,15 +11,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /api
-    backendRefs:
-    - name: api-gateway
-      port: 8000
-
-  - matches:
-    - path:
-        type: PathPrefix
         value: /
     backendRefs:
-    - name: frontend-web
-      port: 3000
+    - name: api-gateway
+      port: 80

@@ -11,15 +11,7 @@ spec:
   - matches:
     - path:
         type: PathPrefix
-        value: /api
-    backendRefs:
-    - name: api-gateway
-      port: 8000
-
-  - matches:
-    - path:
-        type: PathPrefix
         value: /
     backendRefs:
-    - name: frontend-web
+    - name: api-gateway
       port: 80
