@@ -31,7 +31,8 @@ spec:
   - metadata:
       name: mongo-data
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: [ "ReadWriteMany" ]
+      storageClassName: nfs-storage
       resources:
         requests:
-          storage: 1Gi
+          storage: 5Gi
