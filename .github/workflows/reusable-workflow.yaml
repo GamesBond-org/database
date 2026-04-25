@@ -45,9 +45,9 @@ jobs:
           to: ${{ secrets.TARGET_EMAIL }}
           from: ${{ secrets.SOURCE_EMAIL }}
           body: |
-            SonarQube scan failed.
+            SonarQube scan failed
 
-            Repository: ${{ github.repository }}
+            Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
@@ -67,7 +67,6 @@ jobs:
 
       - name: Run Snyk Scan
         uses: snyk/actions/node@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -85,9 +84,9 @@ jobs:
           to: ${{ secrets.TARGET_EMAIL }}
           from: ${{ secrets.SOURCE_EMAIL }}
           body: |
-            Snyk scan failed.
+            Snyk scan failed
 
-            Repository: ${{ github.repository }}
+            Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
@@ -106,7 +105,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: temp:${{ github.sha }}
-          exit-code: 0
+          exit-code: 1
           severity: HIGH,CRITICAL
 
       - name: Send Trivy Failure Mail
@@ -121,9 +120,9 @@ jobs:
           to: ${{ secrets.TARGET_EMAIL }}
           from: ${{ secrets.SOURCE_EMAIL }}
           body: |
-            Trivy scan failed.
+            Trivy scan failed
 
-            Repository: ${{ github.repository }}
+            Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
@@ -140,11 +139,11 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner,, }}/${{ inputs.image_name }}:${{ github.sha }} .
+          docker build -t ghcr.io/${{ toLower(github.repository_owner) }}/${{ inputs.image_name }}:${{ github.sha }} .
 
       - name: Push Docker Image
         run: |
-          docker push ghcr.io/${{ github.repository_owner,, }}/${{ inputs.image_name }}:${{ github.sha }}
+          docker push ghcr.io/${{ toLower(github.repository_owner) }}/${{ inputs.image_name }}:${{ github.sha }}
 
       - name: Send Push Failure Mail
         if: failure()
@@ -158,9 +157,9 @@ jobs:
           to: ${{ secrets.TARGET_EMAIL }}
           from: ${{ secrets.SOURCE_EMAIL }}
           body: |
-            Docker image push failed.
+            Docker push failed
 
-            Repository: ${{ github.repository }}
+            Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
@@ -172,15 +171,15 @@ jobs:
           server_port: 587
           username: ${{ secrets.SOURCE_EMAIL }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Pipeline Success - ${{ github.repository }}"
+          subject: "CI Pipeline Success - ${{ github.repository }}"
           to: ${{ secrets.TARGET_EMAIL }}
           from: ${{ secrets.SOURCE_EMAIL }}
           body: |
-            CI Pipeline completed successfully.
+            CI Pipeline completed successfully
 
-            Repository: ${{ github.repository }}
+            Repo: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
 
-            Docker Image:
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }}
+            Image:
+            ghcr.io/${{ toLower(github.repository_owner) }}/${{ inputs.image_name }}:${{ github.sha }}
