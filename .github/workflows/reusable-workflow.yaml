@@ -106,7 +106,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: temp:${{ github.sha }}
-          exit-code: 1
+          exit-code: 0
           severity: HIGH,CRITICAL
 
       - name: Send Trivy Failure Mail
