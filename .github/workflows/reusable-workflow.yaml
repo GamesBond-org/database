@@ -1,0 +1,185 @@
+name: Reusable CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+
+      sonar_project_key:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+
+  sonar:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sonar Scan
+        uses: SonarSource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ inputs.sonar_project_key }}
+
+      - name: Send Sonar Failure Mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SOURCE_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Sonar Failed - ${{ github.repository }}"
+          to: ${{ secrets.TARGET_EMAIL }}
+          from: ${{ secrets.SOURCE_EMAIL }}
+          body: |
+            SonarQube scan failed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+  snyk:
+    name: Snyk Scan
+    needs: sonar
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package.json ]; then
+            npm install
+          fi
+
+      - name: Run Snyk Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+
+      - name: Send Snyk Failure Mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SOURCE_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Snyk Failed - ${{ github.repository }}"
+          to: ${{ secrets.TARGET_EMAIL }}
+          from: ${{ secrets.SOURCE_EMAIL }}
+          body: |
+            Snyk scan failed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+  trivy:
+    name: Trivy Scan
+    needs: snyk
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Temp Image
+        run: docker build -t temp:${{ github.sha }} .
+
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: temp:${{ github.sha }}
+          exit-code: 1
+          severity: HIGH,CRITICAL
+
+      - name: Send Trivy Failure Mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SOURCE_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Trivy Failed - ${{ github.repository }}"
+          to: ${{ secrets.TARGET_EMAIL }}
+          from: ${{ secrets.SOURCE_EMAIL }}
+          body: |
+            Trivy scan failed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+  push:
+    name: Build and Push GHCR
+    needs: trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }} .
+
+      - name: Push Docker Image
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }}
+
+      - name: Send Push Failure Mail
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SOURCE_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "GHCR Push Failed - ${{ github.repository }}"
+          to: ${{ secrets.TARGET_EMAIL }}
+          from: ${{ secrets.SOURCE_EMAIL }}
+          body: |
+            Docker image push failed.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+      - name: Send Success Mail
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SOURCE_EMAIL }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Pipeline Success - ${{ github.repository }}"
+          to: ${{ secrets.TARGET_EMAIL }}
+          from: ${{ secrets.SOURCE_EMAIL }}
+          body: |
+            CI Pipeline completed successfully.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+            Docker Image:
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:${{ github.sha }}
