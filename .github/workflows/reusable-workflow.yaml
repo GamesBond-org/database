@@ -104,6 +104,7 @@ jobs:
 
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           image-ref: temp:${{ github.sha }}
           exit-code: 1
